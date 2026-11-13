@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Production builds
+dist/
+frontend/dist/
+build/
+
+# Python
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+backend/.venv/
+
+# Environment files & Secrets
+.env
+*.env
+!*.env.example
+frontend/.env
+backend/.env
+
+# Logs & DB
+*.log
+*.sqlite3
+*.db
+backend/*.db
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

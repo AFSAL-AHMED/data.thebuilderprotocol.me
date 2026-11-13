@@ -1,0 +1,80 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tbp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-tbp}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-tbp}
+      POSTGRES_DB: ${DATABASE_DB:-tbp_datasets}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tbp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-tbp} -d ${DATABASE_DB:-tbp_datasets}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tbp-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-tbp}:${DATABASE_PASSWORD:-tbp}@postgres:5432/${DATABASE_DB:-tbp_datasets}
+    networks:
+      - tbp-network
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tbp-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - tbp-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: tbp-pgadmin
+    profiles:
+      - dev
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@thebuilderprotocol.me
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    networks:
+      - tbp-network
+    depends_on:
+      - postgres
+
+networks:
+  tbp-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

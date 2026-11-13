@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend tests ─────────────────────────────────────────────────────────
+  backend-test:
+    name: Backend — pytest (Python 3.11)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tbp
+          POSTGRES_PASSWORD: tbp
+          POSTGRES_DB: tbp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://tbp:tbp@localhost:5432/tbp_test
+          SECRET_KEY: ci-test-secret-key-not-for-production
+          ENVIRONMENT: testing
+        run: alembic upgrade head
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://tbp:tbp@localhost:5432/tbp_test
+          SECRET_KEY: ci-test-secret-key-not-for-production
+          ENVIRONMENT: testing
+        run: |
+          if [ -d tests ] && [ "$(ls -A tests)" ]; then
+            pytest tests/ -v --tb=short
+          else
+            echo "No tests yet — scaffolding check passed."
+          fi
+
+  # ── Frontend build ────────────────────────────────────────────────────────
+  frontend-build:
+    name: Frontend — pnpm build (Node 20)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack / pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          VITE_API_URL: /api
